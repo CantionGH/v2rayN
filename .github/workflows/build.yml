@@ -132,6 +132,15 @@ jobs:
         find ${{ env.OUTPUT }} -type f -name '*.sym' -delete
         find ${{ env.OUTPUT }} -name '*.dSYM' -exec rm -rf {} +
 
+    - name: Build macOS privileged TUN components
+      if: inputs.target == 'macos'
+      shell: bash
+      run: |
+        bash macos/build-tun-helper.sh "$RID" "$OUTPUT/macos-tun"
+        if [[ "${{ inputs.isAot }}" == "true" ]]; then
+          touch "$OUTPUT/v2rayN.NativeAOT"
+        fi
+
     - name: Upload build artifacts
       uses: actions/upload-artifact@v7
       with:

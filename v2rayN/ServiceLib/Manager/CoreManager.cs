@@ -12,8 +12,8 @@ public class CoreManager
     [SupportedOSPlatform("windows")]
     private WindowsJobService? _processJob;
 
-    private ProcessService? _processService;
-    private ProcessService? _processPreService;
+    private ICoreProcess? _processService;
+    private ICoreProcess? _processPreService;
     private bool _linuxSudo = false;
     private Func<bool, string, Task>? _updateFunc;
     private const string _tag = "CoreHandler";
@@ -119,7 +119,7 @@ public class CoreManager
         await UpdateFunc(false, configPath);
 
         var coreInfo = CoreInfoManager.Instance.GetCoreInfo(coreType);
-        return await RunProcess(coreInfo, fileName, true, false);
+        return await RunProcess(coreInfo, fileName, true, false) as ProcessService;
     }
 
     public async Task<ProcessService?> LoadCoreConfigSpeedtest(ServerTestItem testItem)
@@ -141,7 +141,7 @@ public class CoreManager
 
         var coreType = context.RunCoreType;
         var coreInfo = CoreInfoManager.Instance.GetCoreInfo(coreType);
-        return await RunProcess(coreInfo, fileName, true, false);
+        return await RunProcess(coreInfo, fileName, true, false) as ProcessService;
     }
 
     public async Task CoreStop()
@@ -156,16 +156,16 @@ public class CoreManager
 
             if (_processService != null)
             {
-                await _processService.StopAsync();
-                _processService.Dispose();
+                var process = _processService;
                 _processService = null;
+                await StopOwnedProcess(process);
             }
 
             if (_processPreService != null)
             {
-                await _processPreService.StopAsync();
-                _processPreService.Dispose();
+                var process = _processPreService;
                 _processPreService = null;
+                await StopOwnedProcess(process);
             }
         }
         catch (Exception ex)
@@ -175,6 +175,22 @@ public class CoreManager
     }
 
     #region Private
+
+    private static async Task StopOwnedProcess(ICoreProcess process)
+    {
+        try
+        {
+            await process.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            Logging.SaveLog(_tag, ex);
+        }
+        finally
+        {
+            process.Dispose();
+        }
+    }
 
     private async Task CoreStart(CoreConfigContext context)
     {
@@ -302,8 +318,25 @@ public class CoreManager
             && isNonWindows;
     }
 
-    private async Task<ProcessService?> RunProcess(CoreInfo? coreInfo, string configPath, bool displayLog, bool mayNeedSudo, bool isTunLaunch = false)
+    private async Task<ICoreProcess?> RunProcess(CoreInfo? coreInfo, string configPath, bool displayLog, bool mayNeedSudo, bool isTunLaunch = false)
     {
+        // Do not resolve a user-updatable executable for a privileged macOS launch.
+        // The helper selects its own signed, bundled executable by core type.
+        if (Utils.IsMacOS() && mayNeedSudo
+            && ShouldRunAsSudo(isTunLaunch, coreInfo?.CoreType, isNonWindows: true))
+        {
+            try
+            {
+                return await MacOSTunProcessService.StartAsync(coreInfo.CoreType, Utils.GetBinConfigPath(configPath), displayLog, _updateFunc);
+            }
+            catch (Exception ex)
+            {
+                Logging.SaveLog(_tag, ex);
+                await UpdateFunc(true, ex.Message);
+                return null; // Fail closed: never fall back to sudo or a password prompt.
+            }
+        }
+
         var fileName = CoreInfoManager.Instance.GetCoreExecFile(coreInfo, out var msg);
         if (fileName.IsNullOrEmpty())
         {

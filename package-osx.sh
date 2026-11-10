@@ -16,6 +16,13 @@ cp -f "$PackagePath/v2rayN.app/Contents/MacOS/v2rayN.icns" "$PackagePath/v2rayN.
 echo "When this file exists, app will not store configs under this folder" > "$PackagePath/v2rayN.app/Contents/MacOS/NotStoreConfigHere.txt"
 chmod +x "$PackagePath/v2rayN.app/Contents/MacOS/v2rayN"
 
+# Components are built on the macOS runner, never downloaded as a privileged
+# executable. Unsigned packages can still use ordinary proxy mode, but TUN fails
+# closed until a signed, root-owned NativeAOT app is installed (macos/README.md).
+if [[ -d "$OutputPath/macos-tun" ]]; then
+    bash macos/install-tun-components.sh "$PackagePath/v2rayN.app" "$OutputPath/macos-tun" || exit 1
+fi
+
 cat >"$PackagePath/v2rayN.app/Contents/Info.plist" <<-EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

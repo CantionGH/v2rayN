@@ -12,6 +12,7 @@
 
     <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
         <RuntimeHostConfigurationOption Include="System.Net.Security.UseNetworkFramework" Value="true" />
+        <RuntimeHostConfigurationOption Include="System.StartupHookProvider.IsSupported" Value="false" Trim="true" />
     </ItemGroup>
     
 	<ItemGroup>

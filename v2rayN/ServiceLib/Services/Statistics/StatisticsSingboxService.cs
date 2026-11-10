@@ -48,6 +48,10 @@ public class StatisticsSingboxService
                     continue;
                 }
                 using var ws = new ClientWebSocket();
+                if (Utils.IsMacOS() && _config.TunModeItem.EnableTun)
+                {
+                    ws.Options.SetRequestHeader("Authorization", $"Bearer {MacOSTunProcessService.ApiSecret}");
+                }
                 await ws.ConnectAsync(new Uri(Url), token).ConfigureAwait(false);
 
                 var buffer = new byte[1024];

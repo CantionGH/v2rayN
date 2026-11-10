@@ -1,6 +1,6 @@
 namespace ServiceLib.Services;
 
-public class ProcessService : IDisposable
+public class ProcessService : ICoreProcess
 {
     private readonly Process _process;
     private readonly Func<bool, string, Task>? _updateFunc;

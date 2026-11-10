@@ -437,6 +437,20 @@ public partial class StatusBarViewModel : MyReactiveObject
 
         _config.TunModeItem.EnableTun = EnableTun;
 
+        if (EnableTun && Utils.IsMacOS())
+        {
+            try
+            {
+                await MacOSTunProcessService.PrepareAsync();
+            }
+            catch (Exception ex)
+            {
+                _config.TunModeItem.EnableTun = EnableTun = false;
+                NoticeManager.Instance.Enqueue(ex.Message);
+                return;
+            }
+        }
+
         if (EnableTun && AllowEnableTun() == false)
         {
             // When running as a non-administrator, reboot to administrator mode
@@ -473,7 +487,9 @@ public partial class StatusBarViewModel : MyReactiveObject
         }
         else if (Utils.IsMacOS())
         {
-            return AppManager.Instance.LinuxSudoPwd.IsNotEmpty();
+            // Authorization belongs to SMAppService, not a cached administrator password.
+            // Actual availability is checked before enabling and on every core launch.
+            return true;
         }
         return false;
     }

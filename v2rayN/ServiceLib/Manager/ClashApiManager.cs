@@ -10,9 +10,19 @@ public sealed class ClashApiManager
 
     private static string ApiUrl => $"{Global.HttpProtocol}{Global.Loopback}:{AppManager.Instance.StatePort2}";
 
+    private static HttpClient CreateClient()
+    {
+        var client = HttpClientHelper.Instance.GetHttpClient(false);
+        if (Utils.IsMacOS() && AppManager.Instance.Config.TunModeItem.EnableTun)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", MacOSTunProcessService.ApiSecret);
+        }
+        return client;
+    }
+
     public async Task<ClashItem?> GetProxies()
     {
-        using var httpClient = HttpClientHelper.Instance.GetHttpClient(false);
+        using var httpClient = CreateClient();
         for (var i = 0; i < 3; i++)
         {
             ClashProxies? clashProxies = null;
@@ -98,7 +108,7 @@ public sealed class ClashApiManager
     {
         try
         {
-            using var httpClient = HttpClientHelper.Instance.GetHttpClient(false);
+            using var httpClient = CreateClient();
             var result = await httpClient.GetStringAsync(url);
             var jsonObject = JsonUtils.ParseJson(result) as JsonObject;
             return jsonObject?["delay"] is { } n && n.GetValueKind() == JsonValueKind.Number &&
@@ -117,7 +127,7 @@ public sealed class ClashApiManager
     {
         try
         {
-            using var httpClient = HttpClientHelper.Instance.GetHttpClient(false);
+            using var httpClient = CreateClient();
             var url = $"{ApiUrl}/proxies/{Utils.UrlEncode(groupName)}";
             var jsonObject = new JsonObject
             {
@@ -148,7 +158,7 @@ public sealed class ClashApiManager
         {
             var urlBase = $"{ApiUrl}/configs";
 
-            using var httpClient = HttpClientHelper.Instance.GetHttpClient(false);
+            using var httpClient = CreateClient();
             var jsonString = JsonUtils.Serialize(jsonObject);
             var buffer = Encoding.UTF8.GetBytes(jsonString);
             var byteContent = new ByteArrayContent(buffer);
@@ -194,7 +204,7 @@ public sealed class ClashApiManager
         try
         {
             var url = $"{ApiUrl}/configs";
-            using var httpClient = HttpClientHelper.Instance.GetHttpClient(false);
+            using var httpClient = CreateClient();
             var result = await httpClient.GetStringAsync(url);
             var jsonNode = JsonUtils.ParseJson(result);
             if (jsonNode is not JsonObject jsonObject)
@@ -215,7 +225,7 @@ public sealed class ClashApiManager
         try
         {
             var url = $"{ApiUrl}/connections";
-            using var httpClient = HttpClientHelper.Instance.GetHttpClient(false);
+            using var httpClient = CreateClient();
             var result = await httpClient.GetStringAsync(url);
             var clashConnections = JsonUtils.Deserialize<ClashConnections>(result);
 
@@ -234,7 +244,7 @@ public sealed class ClashApiManager
         try
         {
             var url = $"{ApiUrl}/connections/{id}";
-            using var httpClient = HttpClientHelper.Instance.GetHttpClient(false);
+            using var httpClient = CreateClient();
             await httpClient.DeleteAsync(url);
         }
         catch (Exception ex)

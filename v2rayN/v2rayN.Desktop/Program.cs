@@ -1,5 +1,6 @@
 using v2rayN.Desktop.Common;
 using v2rayN.Desktop.Manager;
+using ServiceLib.Services;
 
 namespace v2rayN.Desktop;
 
@@ -13,6 +14,26 @@ internal class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Service management must originate from the real app bundle, not a
+        // standalone CLI whose mainBundle SMAppService cannot reliably identify.
+        // These options do not expose a core launcher or arbitrary root commands.
+        if (OperatingSystem.IsMacOS() && args.Length == 1
+            && args[0] is "--macos-tun-status" or "--macos-tun-unregister")
+        {
+            try
+            {
+                Console.WriteLine(args[0] == "--macos-tun-status"
+                    ? MacOSTunProcessService.ServiceStatus()
+                    : MacOSTunProcessService.UnregisterService());
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
+
         if (OnStartup(args) == false)
         {
             Environment.Exit(0);

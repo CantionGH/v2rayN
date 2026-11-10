@@ -1,0 +1,41 @@
+name: macOS privileged TUN validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/macos-privileged-tun-helper]
+  pull_request:
+    paths:
+      - 'macos/**'
+      - 'v2rayN/ServiceLib/**'
+      - 'v2rayN/ServiceLib.Tests/**'
+      - '.github/workflows/macos-tun-helper.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build both architectures
+        run: |
+          bash macos/build-tun-helper.sh osx-arm64 "$RUNNER_TEMP/tun-arm64"
+          bash macos/build-tun-helper.sh osx-x64 "$RUNNER_TEMP/tun-x64"
+      - name: Test native security policy (no root or signing credentials needed)
+        run: bash macos/test-tun-helper.sh "$RUNNER_TEMP/tun-tests"
+      - name: Validate launch daemon definition and scripts
+        run: |
+          plutil -lint macos/TunHelper/2dust.v2rayN.TunHelper.plist
+          bash -n macos/*.sh
+
+  managed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.x'
+      - name: Build and test ServiceLib
+        run: dotnet test --project v2rayN/ServiceLib.Tests -c Release -p:PublishAot=false
