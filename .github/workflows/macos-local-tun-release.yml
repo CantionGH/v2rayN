@@ -27,7 +27,8 @@ jobs:
         include:
           - arch: arm64
             core_arch: arm64
-            runner: macos-15
+            # macos-15 ARM jobs repeatedly failed to acquire a hosted runner.
+            runner: macos-26
           - arch: x64
             core_arch: '64'
             runner: macos-15-intel

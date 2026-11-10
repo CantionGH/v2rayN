@@ -16,7 +16,8 @@ permissions:
 
 jobs:
   native:
-    runs-on: macos-15
+    # Cross-build both architectures here; reserve ARM capacity for package IPC.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - name: Build both architectures
