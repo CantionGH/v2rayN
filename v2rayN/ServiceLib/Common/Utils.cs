@@ -1124,7 +1124,8 @@ public class Utils
         {
             var basePath = GetBaseDirectory();
             //When this file exists, it is equivalent to having no permission to read and write
-            if (File.Exists(Path.Combine(basePath, "NotStoreConfigHere.txt")))
+            if (File.Exists(Path.Combine(basePath, "NotStoreConfigHere.txt"))
+                || (IsMacOS() && File.Exists(Path.GetFullPath(Path.Combine(basePath, "../Resources/NotStoreConfigHere.txt")))))
             {
                 return false;
             }

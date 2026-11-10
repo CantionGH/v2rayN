@@ -15,7 +15,7 @@ cp -R "$PUBLISHED/." "$APP/Contents/MacOS/"
 mv "$APP/Contents/MacOS/v2rayN.NativeAOT" "$APP/Contents/Resources/"
 cp -R "$CORES/bin" "$APP/Contents/MacOS/"
 cp "$PUBLISHED/v2rayN.icns" "$APP/Contents/Resources/AppIcon.icns"
-echo 'Store GUI data in the ordinary user data directory, never in this bundle.' > "$APP/Contents/MacOS/NotStoreConfigHere.txt"
+echo 'Store GUI data in the ordinary user data directory, never in this bundle.' > "$APP/Contents/Resources/NotStoreConfigHere.txt"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -37,3 +37,12 @@ bash "$ROOT/macos/install-tun-components.sh" "$APP" "$NATIVE"
 # interpret GeoIP databases as unsigned subcomponents. Keep the ordinary-user
 # core seed in Resources; the privileged copies already have fixed role paths.
 mv "$APP/Contents/MacOS/bin" "$APP/Contents/Resources/BundledCores"
+# Publish also includes icons and may include other data files. A code-only
+# MacOS directory avoids treating any of them as unsigned nested executables.
+for entry in "$APP/Contents/MacOS/"*; do
+  if [[ -f "$entry" ]] && /usr/bin/file -b "$entry" | grep -q 'Mach-O'; then
+    continue
+  fi
+  mv "$entry" "$APP/Contents/Resources/"
+done
+[[ -f "$APP/Contents/MacOS/v2rayN" ]] || { echo 'The published GUI must be a native Mach-O executable.' >&2; exit 1; }

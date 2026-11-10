@@ -19,7 +19,10 @@ done
 bash "$ROOT/macos/assemble-app.sh" "$WORK/publish" "$WORK/cores" "$NATIVE" "$WORK/v2rayN.app" 7.25.6
 [[ ! -e "$WORK/v2rayN.app/Contents/MacOS/bin" &&
    ! -e "$WORK/v2rayN.app/Contents/MacOS/v2rayN.NativeAOT" &&
-   -f "$WORK/v2rayN.app/Contents/Resources/v2rayN.NativeAOT" ]]
+   -f "$WORK/v2rayN.app/Contents/Resources/v2rayN.NativeAOT" &&
+   ! -e "$WORK/v2rayN.app/Contents/MacOS/v2rayN.icns" &&
+   ! -e "$WORK/v2rayN.app/Contents/MacOS/NotStoreConfigHere.txt" &&
+   -f "$WORK/v2rayN.app/Contents/Resources/NotStoreConfigHere.txt" ]]
 bash "$ROOT/macos/package-local-tun.sh" "$WORK/v2rayN.app" 7.25.6 "$WORK/fixture.pkg"
 [[ -s "$WORK/fixture.pkg" && -x "$WORK/v2rayN.app/Contents/MacOS/v2rayN" ]]
 echo 'PASS: real nested-code signing, strict verification and PKG construction with fixture resources'
