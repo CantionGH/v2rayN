@@ -17,6 +17,9 @@ find "$APP" -type d -exec chmod 755 {} +
 find "$APP" -type f -exec chmod 644 {} +
 chmod -RN "$APP"
 while IFS= read -r -d '' binary; do
+  # Signing the main executable signs its enclosing bundle. Do that only after
+  # every nested executable/library has its final signature.
+  [[ "$binary" != "$APP/Contents/MacOS/v2rayN" ]] || continue
   if /usr/bin/file -b "$binary" | grep -q 'Mach-O'; then
     chmod 755 "$binary"
     identifier="2dust.v2rayN.Runtime.$(basename "$binary")"
@@ -25,11 +28,11 @@ while IFS= read -r -d '' binary; do
       */v2rayn-tun-helper) identifier=2dust.v2rayN.TunHelper ;;
       */v2rayn-tun-trust) identifier=2dust.v2rayN.TunTrustTool ;;
       */libV2rayNTun.dylib) identifier=2dust.v2rayN.TunClient ;;
-      */MacOS/v2rayN) identifier=2dust.v2rayN ;;
     esac
     codesign --force --sign - --options runtime --timestamp=none --identifier "$identifier" "$binary"
   fi
 done < <(find "$APP" -type f -print0)
+chmod 755 "$APP/Contents/MacOS/v2rayN"
 codesign --force --sign - --options runtime --timestamp=none \
   --entitlements "$ROOT/macos/local-gui.entitlements.plist" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"

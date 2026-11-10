@@ -27,6 +27,14 @@ public class CoreManager
         if (Environment.GetEnvironmentVariable(Global.LocalAppData) == "1")
         {
             var fromPath = Utils.GetBaseDirectory("bin");
+            if (Utils.IsMacOS())
+            {
+                var bundledCores = Path.GetFullPath(Utils.GetBaseDirectory("../Resources/BundledCores"));
+                if (Directory.Exists(bundledCores))
+                {
+                    fromPath = bundledCores;
+                }
+            }
             var toPath = Utils.GetBinPath("");
             if (fromPath != toPath)
             {

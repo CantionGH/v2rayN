@@ -32,3 +32,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 bash "$ROOT/macos/install-tun-components.sh" "$APP" "$NATIVE"
+# MacOS is a nested-code location: a mixed bin directory there makes codesign
+# interpret GeoIP databases as unsigned subcomponents. Keep the ordinary-user
+# core seed in Resources; the privileged copies already have fixed role paths.
+mv "$APP/Contents/MacOS/bin" "$APP/Contents/Resources/BundledCores"
