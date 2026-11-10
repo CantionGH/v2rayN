@@ -1,0 +1,125 @@
+name: macOS local-trust TUN packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/macos-local-trust-tun]
+    tags: ['local-tun-*']
+
+permissions:
+  contents: read
+
+jobs:
+  managed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test --project v2rayN/ServiceLib.Tests -c Release -p:PublishAot=false -- --maximum-parallel-tests 1
+
+  package:
+    needs: managed
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            core_arch: arm64
+            runner: macos-15
+          - arch: x64
+            core_arch: '64'
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      RID: osx-${{ matrix.arch }}
+      CORE_ARCH: ${{ matrix.core_arch }}
+      CORE_COMMIT: bc603e1ee3c6eb90f16fe9123f7df80bc02f8435
+      MACOSX_DEPLOYMENT_TARGET: '13.6'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Native policy tests and explicit local-mode build
+        run: |
+          bash macos/test-tun-helper.sh "$RUNNER_TEMP/tun-tests" local
+          bash macos/build-tun-helper.sh "$RID" "$RUNNER_TEMP/tun-native" local
+      - name: Publish NativeAOT GUI
+        run: |
+          dotnet publish v2rayN/v2rayN.Desktop/v2rayN.Desktop.csproj -c Release -r "$RID" \
+            -p:SelfContained=true -p:IsAot=true -p:DebugType=None -p:DebugSymbols=false \
+            -o "$RUNNER_TEMP/tun-publish"
+          touch "$RUNNER_TEMP/tun-publish/v2rayN.NativeAOT"
+      - name: Fetch fixed core bundle revision
+        run: |
+          curl --fail --location --retry 3 \
+            "https://github.com/2dust/v2rayN-core-bin/raw/$CORE_COMMIT/v2rayN-macos-$CORE_ARCH.zip" \
+            -o "$RUNNER_TEMP/cores.zip"
+          unzip -q "$RUNNER_TEMP/cores.zip" -d "$RUNNER_TEMP/cores"
+      - name: Assemble and package (no Developer ID, no notarization)
+        run: |
+          mkdir -p dist
+          bash macos/assemble-app.sh "$RUNNER_TEMP/tun-publish" \
+            "$RUNNER_TEMP/cores/v2rayN-macos-$CORE_ARCH" "$RUNNER_TEMP/tun-native" \
+            "$RUNNER_TEMP/v2rayN.app" 7.25.6
+          bash macos/package-local-tun.sh "$RUNNER_TEMP/v2rayN.app" 7.25.6 \
+            "dist/v2rayN-macos-${{ matrix.arch }}-local-tun.pkg"
+          cp 'macos/local-installer/Uninstall Local TUN.command' dist/
+          chmod 755 'dist/Uninstall Local TUN.command'
+          cp macos/LOCAL-TESTING.md dist/README-local-tun.md
+          cp LICENSE dist/LICENSE.txt
+      - name: Install and test authenticated IPC without creating TUN/routes
+        run: |
+          sudo /usr/sbin/installer -pkg "dist/v2rayN-macos-${{ matrix.arch }}-local-tun.pkg" -target /
+          '/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/MacOS/v2rayN' --macos-tun-self-test
+          xcrun clang -DV2RAYN_TUN_LOCAL_TRUST=1 -fobjc-arc -fblocks -Wall -Wextra -Werror -Wno-unused-parameter \
+            macos/TunHelper/Tests/UntrustedClient.m -framework Foundation -o "$RUNNER_TEMP/untrusted-client"
+          "$RUNNER_TEMP/untrusted-client"
+          if '/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/Library/LaunchServices/v2rayn-tun-trust' enroll; then
+            echo 'ERROR: unprivileged enrollment unexpectedly succeeded' >&2
+            exit 1
+          fi
+      - name: Revoke local trust on the temporary runner
+        if: always()
+        run: |
+          script='/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/Resources/LocalTun/uninstall.sh'
+          if [[ -f "$script" ]]; then sudo /bin/bash -p "$script"; fi
+      - name: Archive self-test distribution
+        run: |
+          ditto -c -k --keepParent dist "v2rayN-macos-${{ matrix.arch }}-local-tun.zip"
+          shasum -a 256 "v2rayN-macos-${{ matrix.arch }}-local-tun.zip" > "v2rayN-macos-${{ matrix.arch }}-local-tun.sha256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: local-tun-${{ matrix.arch }}
+          path: |
+            v2rayN-macos-${{ matrix.arch }}-local-tun.zip
+            v2rayN-macos-${{ matrix.arch }}-local-tun.sha256
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/local-tun-') && github.repository == 'CantionGH/v2rayN'
+    needs: [managed, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: local-tun-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish explicitly experimental local-trust release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
+            --title "$RELEASE_TAG (macOS self-test; no Developer ID)" \
+            --notes-file macos/LOCAL-RELEASE-NOTES.md

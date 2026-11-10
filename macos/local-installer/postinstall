@@ -1,0 +1,20 @@
+#!/bin/bash -p
+set -euo pipefail
+[[ "$EUID" == 0 && "${3:-/}" == / ]] || exit 1
+ROOT='/Library/Application Support/v2rayN-LocalTun'
+APP="$ROOT/v2rayN.app"
+PLIST='/Library/LaunchDaemons/2dust.v2rayN.LocalTunHelper.plist'
+[[ -d "$APP" && ! -L "$APP" && ! -L "$PLIST" ]] || exit 1
+
+# The installer already owns the payload. Strip ACLs on this installation only;
+# never weaken system ancestor permissions or alter sudoers/Gatekeeper.
+/bin/chmod -RN "$APP"
+"$APP/Contents/Library/LaunchServices/v2rayn-tun-trust" enroll
+/usr/bin/install -S -o root -g wheel -m 644 \
+  "$APP/Contents/Library/LaunchDaemons/2dust.v2rayN.LocalTunHelper.plist" "$PLIST"
+if ! /bin/launchctl bootstrap system "$PLIST"; then
+  /bin/rm -f "$ROOT/trust.plist" "$PLIST"
+  echo 'Local TUN service registration failed; local trust has been revoked.' >&2
+  exit 1
+fi
+echo "Installed self-test TUN service. Launch $APP as your ordinary user, never as root."

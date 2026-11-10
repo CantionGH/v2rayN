@@ -2,6 +2,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <mach-o/dyld.h>
+#include <sys/acl.h>
+#include <errno.h>
 
 static NSDictionary *SigningInfo(SecCodeRef code, SecCSFlags flags) {
     CFDictionaryRef info = NULL;
@@ -20,6 +22,9 @@ NSString *TunTeamIdentifier(void) {
 }
 
 static SecRequirementRef Requirement(NSString *identifier) {
+#ifdef V2RAYN_TUN_LOCAL_TRUST
+    return TunLocalRequirement(identifier);
+#else
     NSString *team = TunTeamIdentifier();
     if (!team) return NULL; // Unsigned/ad-hoc builds cannot authorize root operations.
     NSString *text = [NSString stringWithFormat:
@@ -27,6 +32,7 @@ static SecRequirementRef Requirement(NSString *identifier) {
     SecRequirementRef requirement = NULL;
     if (SecRequirementCreateWithString((__bridge CFStringRef)text, kSecCSDefaultFlags, &requirement) != errSecSuccess) return NULL;
     return requirement;
+#endif
 }
 
 BOOL TunValidateMessage(xpc_object_t message, NSString *identifier) {
@@ -43,10 +49,17 @@ BOOL TunValidateMessage(xpc_object_t message, NSString *identifier) {
     const uint32_t runtime = 0x10000, debugged = 0x10000000;
     valid = valid && (flags & runtime) && !(flags & debugged)
         && ![entitlements[@"com.apple.security.get-task-allow"] boolValue]
-        && ![entitlements[@"com.apple.security.cs.disable-library-validation"] boolValue]
         && ![entitlements[@"com.apple.security.cs.allow-dyld-environment-variables"] boolValue]
         && ![entitlements[@"com.apple.security.cs.allow-jit"] boolValue]
         && ![entitlements[@"com.apple.security.cs.allow-unsigned-executable-memory"] boolValue];
+#ifdef V2RAYN_TUN_LOCAL_TRUST
+    // Ad-hoc native Avalonia libraries have no Team ID. Only the exact locally
+    // enrolled GUI may carry this narrowly documented exception. Helpers may not.
+    valid = valid && TunLocalValidateOrigin(info, identifier)
+        && ([identifier isEqual:TUN_APP_ID] || ![entitlements[@"com.apple.security.cs.disable-library-validation"] boolValue]);
+#else
+    valid = valid && ![entitlements[@"com.apple.security.cs.disable-library-validation"] boolValue];
+#endif
     if (requirement) CFRelease(requirement);
     CFRelease(code);
     return valid;
@@ -59,7 +72,32 @@ BOOL TunRootOwnedPath(NSURL *url) {
         struct stat st;
         // Reject symlinks, non-root owners, and group/other-writable ancestors.
         if (lstat(path.fileSystemRepresentation, &st) != 0 || S_ISLNK(st.st_mode)
-            || st.st_uid != 0 || (st.st_mode & 0022)) return NO;
+            || st.st_uid != 0 || (st.st_mode & (0022 | S_ISUID | S_ISGID))) return NO;
+        // Mode bits alone miss ACL grants. Do not trust writable bundle entries
+        // or ancestors even if stat reports root:wheel 0755/0644.
+        acl_t acl = acl_get_file(path.fileSystemRepresentation, ACL_TYPE_EXTENDED);
+        if (!acl && errno != ENOATTR) return NO;
+        if (acl) {
+            acl_entry_t entry;
+            int next = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
+            BOOL writable = NO;
+            while (next == 0) {
+                acl_tag_t tag;
+                acl_permset_t permissions;
+                if (acl_get_tag_type(entry, &tag) != 0 || acl_get_permset(entry, &permissions) != 0) { writable = YES; break; }
+                if (tag == ACL_EXTENDED_ALLOW) {
+                    const acl_perm_t writes[] = {ACL_WRITE_DATA, ACL_APPEND_DATA, ACL_DELETE,
+                        ACL_DELETE_CHILD, ACL_WRITE_ATTRIBUTES, ACL_WRITE_EXTATTRIBUTES, ACL_WRITE_SECURITY, ACL_CHANGE_OWNER};
+                    for (NSUInteger i = 0; i < sizeof(writes) / sizeof(writes[0]); i++) {
+                        if (acl_get_perm_np(permissions, writes[i]) != 0) { writable = YES; break; }
+                    }
+                }
+                if (writable) break;
+                next = acl_get_entry(acl, ACL_NEXT_ENTRY, &entry);
+            }
+            acl_free(acl);
+            if (writable) return NO;
+        }
         if ([path isEqualToString:@"/"]) return YES;
         path = path.stringByDeletingLastPathComponent;
     }
@@ -72,6 +110,9 @@ BOOL TunValidateExecutable(NSURL *url, NSString *identifier) {
     SecRequirementRef requirement = Requirement(identifier);
     BOOL valid = requirement && SecStaticCodeCheckValidity(code,
         kSecCSStrictValidate | kSecCSCheckAllArchitectures, requirement) == errSecSuccess;
+#ifdef V2RAYN_TUN_LOCAL_TRUST
+    valid = valid && TunLocalValidateFile(url, identifier);
+#endif
     if (requirement) CFRelease(requirement);
     CFRelease(code);
     return valid;
@@ -97,7 +138,7 @@ NSURL *TunApplicationURL(void) {
 BOOL TunValidateApplication(NSURL *app) {
     // /Applications can be group-admin writable. Use the installer's protected
     // location so an unprivileged admin cannot swap an ancestor after validation.
-    if (!app || ![app.URLByDeletingLastPathComponent.path isEqualToString:@"/Library/Application Support/v2rayN"]
+    if (!app || ![app.URLByDeletingLastPathComponent.path isEqualToString:TUN_INSTALL_PARENT]
         || !TunValidateExecutable(app, TUN_APP_ID)) return NO;
     if (![NSFileManager.defaultManager fileExistsAtPath:
         [app URLByAppendingPathComponent:@"Contents/MacOS/v2rayN.NativeAOT"].path]) return NO;
@@ -110,7 +151,12 @@ BOOL TunValidateApplication(NSURL *app) {
     for (NSURL *entry in entries) {
         if (!TunRootOwnedPath(entry)) return NO;
     }
-    return !failed;
+    if (failed) return NO;
+#ifdef V2RAYN_TUN_LOCAL_TRUST
+    return TunLocalVerifyInventory(app);
+#else
+    return YES;
+#endif
 }
 
 NSDictionary *TunError(NSString *message) { return @{@"ok": @NO, @"error": message ?: @"TUN service error"}; }

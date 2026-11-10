@@ -118,12 +118,12 @@ static BOOL WritePrivateFile(NSURL *url, NSData *data) {
     NSString *identifier = [@"2dust.v2rayN.TunCore." stringByAppendingString:core];
     if (!TunValidateExecutable(executable, identifier)) return TunError(@"The bundled TUN core has an invalid signature or ownership. Reinstall the signed application.");
 
-    const char *base = "/private/var/run/v2rayn-tun";
+    const char *base = TUN_SESSION_ROOT;
     if ((mkdir(base, 0700) != 0 && errno != EEXIST) ||
         !TunRootOwnedPath([NSURL fileURLWithPath:@(base)])) return TunError(@"Unsafe TUN session directory");
     struct stat st;
     if (lstat(base, &st) != 0 || !S_ISDIR(st.st_mode) || (st.st_mode & 0777) != 0700) return TunError(@"Unsafe TUN session permissions");
-    char pattern[] = "/private/var/run/v2rayn-tun/session.XXXXXX";
+    char pattern[] = TUN_SESSION_ROOT "/session.XXXXXX";
     if (!mkdtemp(pattern)) return TunError(@"Cannot create a private TUN session");
     _directory = [NSURL fileURLWithPath:@(pattern) isDirectory:YES];
     NSURL *assetDirectory = [_directory URLByAppendingPathComponent:@"assets" isDirectory:YES];
@@ -134,7 +134,7 @@ static BOOL WritePrivateFile(NSURL *url, NSData *data) {
         }
     }
     // Only fixed, signed bundle resources are read with root privileges.
-    for (NSString *name in @[@"geoip.dat", @"geosite.dat"]) {
+    for (NSString *name in @[@"geoip.dat", @"geosite.dat", @"Country.mmdb", @"geoip.metadb"]) {
         NSURL *source = [application URLByAppendingPathComponent:[@"Contents/Resources/TunAssets/" stringByAppendingString:name]];
         if ([NSFileManager.defaultManager fileExistsAtPath:source.path]) {
             if (!TunRootOwnedPath(source) || lstat(source.fileSystemRepresentation, &st) != 0 ||
@@ -254,6 +254,9 @@ int main(void) {
         umask(0077);
         application = TunApplicationURL();
         if (geteuid() != 0 || !TunValidateApplication(application)) return 1;
+#ifdef V2RAYN_TUN_LOCAL_TRUST
+        if (!TunValidateExecutable([application URLByAppendingPathComponent:@"Contents/Library/LaunchServices/v2rayn-tun-helper"], TUN_HELPER_ID)) return 1;
+#endif
         sessions = [NSMutableSet set];
         xpc_connection_t listener = xpc_connection_create_mach_service(TUN_SERVICE,
             dispatch_get_main_queue(), XPC_CONNECTION_MACH_SERVICE_LISTENER);

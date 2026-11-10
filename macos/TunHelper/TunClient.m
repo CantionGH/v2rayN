@@ -13,6 +13,15 @@ __attribute__((visibility("default"))) char *v2rayn_tun_service(const char *acti
     @autoreleasepool {
         NSString *operation = action ? @(action) : @"";
         NSURL *app = TunApplicationURL();
+#ifdef V2RAYN_TUN_LOCAL_TRUST
+        if (!TunValidateApplication(app)) return TunCopyJSON(TunError(
+            @"Install the local-test PKG first. This exact NativeAOT application must be approved in the root-owned local trust manifest."));
+        if ([operation isEqualToString:@"unregister"]) return TunCopyJSON(TunError(
+            @"Local TUN removal requires administrator approval. Use Uninstall Local TUN.command from the local-test package."));
+        if (![operation isEqualToString:@"register"] && ![operation isEqualToString:@"status"])
+            return TunCopyJSON(TunError(@"Unknown local service operation"));
+        return TunCopyJSON(@{@"ok": @YES, @"mode": @"local-cdhash-v1", @"status": @1});
+#else
         if (!TunValidateApplication(app)) return TunCopyJSON(TunError(
             @"TUN requires a Developer ID signed, root-owned NativeAOT app in /Library/Application Support/v2rayN. Use the privileged-TUN installer."));
         SMAppService *service = [SMAppService daemonServiceWithPlistName:TUN_PLIST];
@@ -31,12 +40,17 @@ __attribute__((visibility("default"))) char *v2rayn_tun_service(const char *acti
             return TunCopyJSON(TunError(@"Unknown service operation"));
         }
         return TunCopyJSON(@{@"ok": @YES, @"status": @(service.status)});
+#endif
     }
 }
 
 __attribute__((visibility("default"))) void *v2rayn_tun_open(void) {
     @autoreleasepool {
+#ifdef V2RAYN_TUN_LOCAL_TRUST
+        if (!TunLocalReadManifest() || !TunValidateExecutable(TunApplicationURL(), TUN_APP_ID)) return NULL;
+#else
         if (!TunTeamIdentifier()) return NULL;
+#endif
         TunClient *client = [TunClient new];
         client.queue = dispatch_queue_create(TUN_SERVICE ".client", DISPATCH_QUEUE_SERIAL);
         client.connection = xpc_connection_create_mach_service(TUN_SERVICE, client.queue, XPC_CONNECTION_MACH_SERVICE_PRIVILEGED);

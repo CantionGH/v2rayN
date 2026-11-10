@@ -14,6 +14,10 @@ if [[ "$(basename "$APP")" != "v2rayN.app" ]]; then
   echo "The installer expects an assembled v2rayN.app bundle." >&2
   exit 1
 fi
+if [[ -f "$APP/Contents/Resources/TunLocalTrustBuild" ]]; then
+  echo 'Local-trust components cannot be packaged as a Developer ID build.' >&2
+  exit 1
+fi
 if [[ "$APPLICATION_IDENTITY" != "Developer ID Application:"* || "$INSTALLER_IDENTITY" != "Developer ID Installer:"* ]]; then
   echo "Real Developer ID Application/Installer identities are required; ad-hoc signing is not supported." >&2
   exit 1

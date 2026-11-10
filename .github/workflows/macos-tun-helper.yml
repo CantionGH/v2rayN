@@ -3,7 +3,7 @@ name: macOS privileged TUN validation
 on:
   workflow_dispatch:
   push:
-    branches: [feat/macos-privileged-tun-helper]
+    branches: [feat/macos-privileged-tun-helper, feat/macos-local-trust-tun]
   pull_request:
     paths:
       - 'macos/**'
@@ -16,18 +16,23 @@ permissions:
 
 jobs:
   native:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
       - name: Build both architectures
         run: |
           bash macos/build-tun-helper.sh osx-arm64 "$RUNNER_TEMP/tun-arm64"
           bash macos/build-tun-helper.sh osx-x64 "$RUNNER_TEMP/tun-x64"
+          bash macos/build-tun-helper.sh osx-arm64 "$RUNNER_TEMP/tun-local-arm64" local
+          bash macos/build-tun-helper.sh osx-x64 "$RUNNER_TEMP/tun-local-x64" local
       - name: Test native security policy (no root or signing credentials needed)
-        run: bash macos/test-tun-helper.sh "$RUNNER_TEMP/tun-tests"
+        run: |
+          bash macos/test-tun-helper.sh "$RUNNER_TEMP/tun-tests"
+          bash macos/test-tun-helper.sh "$RUNNER_TEMP/tun-local-tests" local
       - name: Validate launch daemon definition and scripts
         run: |
           plutil -lint macos/TunHelper/2dust.v2rayN.TunHelper.plist
+          plutil -lint macos/TunHelper/2dust.v2rayN.LocalTunHelper.plist
           bash -n macos/*.sh
 
   managed:
@@ -38,4 +43,6 @@ jobs:
         with:
           dotnet-version: '10.x'
       - name: Build and test ServiceLib
-        run: dotnet test --project v2rayN/ServiceLib.Tests -c Release -p:PublishAot=false
+        # Existing database tests share static state; avoid their intermittent
+        # parallel SQLite failures observed on the first hosted run.
+        run: dotnet test --project v2rayN/ServiceLib.Tests -c Release -p:PublishAot=false -- --maximum-parallel-tests 1

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>Label</key><string>2dust.v2rayN.LocalTunHelper</string>
+    <key>ProgramArguments</key><array>
+        <string>/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/Library/LaunchServices/v2rayn-tun-helper</string>
+    </array>
+    <key>MachServices</key><dict><key>2dust.v2rayN.LocalTunHelper</key><true/></dict>
+    <key>UserName</key><string>root</string>
+    <key>ProcessType</key><string>Interactive</string>
+    <key>AbandonProcessGroup</key><false/>
+    <key>ExitTimeOut</key><integer>10</integer>
+    <key>Umask</key><integer>63</integer>
+</dict></plist>

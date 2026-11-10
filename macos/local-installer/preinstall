@@ -1,0 +1,31 @@
+#!/bin/bash -p
+set -euo pipefail
+[[ "$EUID" == 0 && "${3:-/}" == / ]] || { echo 'Install to the current system volume using Installer.' >&2; exit 1; }
+
+check_directory() {
+  local path="$1" mode
+  [[ -d "$path" && ! -L "$path" && "$(/usr/bin/stat -f %u "$path")" == 0 ]] || return 1
+  mode="$(/usr/bin/stat -f %Lp "$path")"
+  (( (8#$mode & 8#022) == 0 )) || return 1
+  # Fail conservatively before payload extraction if an ancestor has ACL grants.
+  # The native enroller additionally checks actual write permissions on all ACLs.
+  if /bin/ls -lde "$path" | /usr/bin/grep -E '^[[:space:]]*[0-9]+:.* allow ' >/dev/null; then return 1; fi
+  return 0
+}
+for path in /Library '/Library/Application Support' /Library/LaunchDaemons; do
+  check_directory "$path" || { echo "Unsafe installation ancestor: $path" >&2; exit 1; }
+done
+ROOT='/Library/Application Support/v2rayN-LocalTun'
+if [[ -e "$ROOT" || -L "$ROOT" ]]; then
+  check_directory "$ROOT" || { echo 'Unsafe local TUN installation directory.' >&2; exit 1; }
+else
+  /bin/mkdir "$ROOT"
+  /usr/sbin/chown root:wheel "$ROOT"
+  /bin/chmod 755 "$ROOT"
+fi
+if /bin/launchctl print system/2dust.v2rayN.LocalTunHelper >/dev/null 2>&1; then
+  /bin/launchctl bootout system/2dust.v2rayN.LocalTunHelper
+fi
+# Revoke old pins before replacing code. A failed upgrade must not keep the old
+# privilege grant active against a partially replaced application.
+/bin/rm -f "$ROOT/trust.plist"

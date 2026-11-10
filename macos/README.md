@@ -1,5 +1,9 @@
 # macOS privileged TUN service (方案 B)
 
+**无 Developer ID 的自用测试实现见 [LOCAL-TESTING.md](LOCAL-TESTING.md)。**
+它必须显式构建为 `local` 模式，使用本机 root 信任清单及独立 launchd 服务，
+不会让下面的 Developer ID 路径自动降级。
+
 This branch replaces macOS's in-app sudo password collection with an
 `SMAppService` launch daemon and authenticated XPC. Linux and Windows retain their
 existing launch paths. **This is a security-sensitive implementation requiring

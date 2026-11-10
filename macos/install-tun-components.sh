@@ -8,7 +8,13 @@ mkdir -p "$CONTENTS/Frameworks" "$CONTENTS/Library/LaunchDaemons" \
   "$CONTENTS/Library/LaunchServices" "$CONTENTS/Library/TunCores" "$CONTENTS/Resources/TunAssets"
 cp "$NATIVE/libV2rayNTun.dylib" "$CONTENTS/Frameworks/"
 cp "$NATIVE/v2rayn-tun-helper" "$CONTENTS/Library/LaunchServices/"
-cp "$NATIVE/2dust.v2rayN.TunHelper.plist" "$CONTENTS/Library/LaunchDaemons/"
+if [[ -f "$NATIVE/LocalTrustBuild" ]]; then
+  cp "$NATIVE/v2rayn-tun-trust" "$CONTENTS/Library/LaunchServices/"
+  cp "$NATIVE/2dust.v2rayN.LocalTunHelper.plist" "$CONTENTS/Library/LaunchDaemons/"
+  touch "$CONTENTS/Resources/TunLocalTrustBuild"
+else
+  cp "$NATIVE/2dust.v2rayN.TunHelper.plist" "$CONTENTS/Library/LaunchDaemons/"
+fi
 
 copy_core() {
   local name="$1"; shift
@@ -26,7 +32,7 @@ copy_core() {
 copy_core sing-box sing_box/sing-box-client sing_box/sing-box
 copy_core xray xray/xray
 copy_core mihomo mihomo/mihomo mihomo/mihomo-darwin-arm64 mihomo/mihomo-darwin-amd64
-for name in geoip.dat geosite.dat; do
+for name in geoip.dat geosite.dat Country.mmdb geoip.metadb; do
   if [[ -f "$CONTENTS/MacOS/bin/$name" && ! -L "$CONTENTS/MacOS/bin/$name" ]]; then
     cp "$CONTENTS/MacOS/bin/$name" "$CONTENTS/Resources/TunAssets/$name"
   fi

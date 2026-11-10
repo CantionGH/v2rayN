@@ -18,13 +18,16 @@ internal class Program
         // standalone CLI whose mainBundle SMAppService cannot reliably identify.
         // These options do not expose a core launcher or arbitrary root commands.
         if (OperatingSystem.IsMacOS() && args.Length == 1
-            && args[0] is "--macos-tun-status" or "--macos-tun-unregister")
+            && args[0] is "--macos-tun-status" or "--macos-tun-unregister" or "--macos-tun-self-test")
         {
             try
             {
-                Console.WriteLine(args[0] == "--macos-tun-status"
-                    ? MacOSTunProcessService.ServiceStatus()
-                    : MacOSTunProcessService.UnregisterService());
+                Console.WriteLine(args[0] switch
+                {
+                    "--macos-tun-status" => MacOSTunProcessService.ServiceStatus(),
+                    "--macos-tun-self-test" => MacOSTunProcessService.VerifyServiceConnection(),
+                    _ => MacOSTunProcessService.UnregisterService(),
+                });
             }
             catch (Exception ex)
             {

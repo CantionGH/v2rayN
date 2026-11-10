@@ -36,6 +36,20 @@ public sealed class MacOSTunProcessService : ICoreProcess
 
     public static string UnregisterService() => ServiceControl("unregister");
 
+    /// <summary>Fixed, non-launching IPC smoke test from the real GUI executable.</summary>
+    public static string VerifyServiceConnection()
+    {
+        ServiceControl("register");
+        using var session = new NativeSession(Native.Open());
+        if (session.IsInvalid)
+        {
+            throw new InvalidOperationException("Unable to connect to the macOS TUN service.");
+        }
+        using var reply = ReadReply(Native.Request(session, "{\"operation\":\"status\"}"));
+        CheckReply(reply.RootElement);
+        return reply.RootElement.GetRawText();
+    }
+
     private static string ServiceControl(string operation)
     {
         EnsureMacOS();
@@ -47,7 +61,7 @@ public sealed class MacOSTunProcessService : ICoreProcess
         }
         catch (DllNotFoundException ex)
         {
-            throw new InvalidOperationException("Install the signed NativeAOT macOS TUN package to use TUN mode. The privileged helper is missing.", ex);
+            throw new InvalidOperationException("Install the approved NativeAOT macOS TUN package to use TUN mode. The privileged helper is missing.", ex);
         }
     }
 
