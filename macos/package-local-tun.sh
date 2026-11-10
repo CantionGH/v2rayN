@@ -38,7 +38,11 @@ codesign --force --sign - --options runtime --timestamp=none \
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/v2rayn-local-package.XXXXXX")"
+# Only this invocation's newly-created temporary staging tree is removed.
+trap 'rm -rf -- "${WORK:?}"' EXIT
 mkdir "$WORK/scripts"
+mkdir "$WORK/payload"
+ditto "$APP" "$WORK/payload/v2rayN.app"
 cp "$ROOT/macos/local-installer/preinstall" "$ROOT/macos/local-installer/postinstall" "$WORK/scripts/"
 chmod 755 "$WORK/scripts/"*
 cat > "$WORK/components.plist" <<'PLIST'
@@ -51,8 +55,7 @@ cat > "$WORK/components.plist" <<'PLIST'
 <key>BundleOverwriteAction</key><string>upgrade</string>
 </dict></array></plist>
 PLIST
-trap 'rm -f "$WORK/scripts/preinstall" "$WORK/scripts/postinstall" "$WORK/components.plist"; rmdir "$WORK/scripts" "$WORK"' EXIT
-pkgbuild --component "$APP" --component-plist "$WORK/components.plist" \
+pkgbuild --root "$WORK/payload" --component-plist "$WORK/components.plist" \
   --identifier 2dust.v2rayN.LocalTun --version "$VERSION" \
   --install-location '/Library/Application Support/v2rayN-LocalTun' \
   --ownership recommended --scripts "$WORK/scripts" "$OUTPUT"
