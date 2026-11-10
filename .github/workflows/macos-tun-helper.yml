@@ -33,7 +33,7 @@ jobs:
         run: |
           plutil -lint macos/TunHelper/2dust.v2rayN.TunHelper.plist
           plutil -lint macos/TunHelper/2dust.v2rayN.LocalTunHelper.plist
-          bash -n macos/*.sh
+          for script in macos/*.sh macos/local-installer/*; do bash -n "$script"; done
 
   managed:
     runs-on: ubuntu-latest

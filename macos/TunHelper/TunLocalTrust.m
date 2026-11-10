@@ -190,6 +190,7 @@ NSDictionary *TunLocalCreateManifest(NSURL *app, NSString **error) {
             ![entitlements[@"com.apple.security.cs.allow-jit"] boolValue] &&
             ![entitlements[@"com.apple.security.cs.allow-unsigned-executable-memory"] boolValue] &&
             ![entitlements[@"com.apple.security.cs.allow-dyld-environment-variables"] boolValue] &&
+            ![entitlements[@"com.apple.security.cs.disable-executable-page-protection"] boolValue] &&
             ([identifier isEqual:TUN_APP_ID] || ![entitlements[@"com.apple.security.cs.disable-library-validation"] boolValue]);
         NSMutableArray *hashes = [NSMutableArray array];
         for (NSData *hash in info[(__bridge NSString *)kSecCodeInfoCdHashes]) {

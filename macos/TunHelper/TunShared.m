@@ -50,6 +50,7 @@ BOOL TunValidateMessage(xpc_object_t message, NSString *identifier) {
     valid = valid && (flags & runtime) && !(flags & debugged)
         && ![entitlements[@"com.apple.security.get-task-allow"] boolValue]
         && ![entitlements[@"com.apple.security.cs.allow-dyld-environment-variables"] boolValue]
+        && ![entitlements[@"com.apple.security.cs.disable-executable-page-protection"] boolValue]
         && ![entitlements[@"com.apple.security.cs.allow-jit"] boolValue]
         && ![entitlements[@"com.apple.security.cs.allow-unsigned-executable-memory"] boolValue];
 #ifdef V2RAYN_TUN_LOCAL_TRUST
