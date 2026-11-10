@@ -59,6 +59,15 @@ jobs:
             sudo find '/Library/Application Support/v2rayN-LocalTun/v2rayN.app' -exec ls -lde {} \;
             exit 1
           fi
+          app='/Library/Application Support/v2rayN-LocalTun/v2rayN.app'
+          protected_file="$app/Contents/Resources/NotStoreConfigHere.txt"
+          sudo /bin/chmod +a 'everyone allow write' "$protected_file"
+          if sudo "$app/Contents/Library/LaunchServices/v2rayn-tun-trust" enroll; then
+            echo 'ERROR: writable ACL unexpectedly accepted' >&2
+            exit 1
+          fi
+          sudo /bin/chmod -N "$protected_file"
+          sudo "$app/Contents/Library/LaunchServices/v2rayn-tun-trust" enroll
           sudo /bin/bash -p '/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/Resources/LocalTun/uninstall.sh'
       - name: Publish NativeAOT GUI
         run: |

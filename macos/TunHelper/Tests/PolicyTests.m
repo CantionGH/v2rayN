@@ -37,6 +37,8 @@ int main(void) {
         Expect(!TunDecodeAssets(@{@"assets": @{name: @"invalid!!!"}}, &error), @"reject malformed base64");
         Expect(!TunDecodeRequest("{}", TUN_MAX_REQUEST + 1), @"request limit checked before copying");
         Expect(!TunRootOwnedPath([NSURL fileURLWithPath:@"/tmp"]), @"no symlink/world-writable ancestors");
+        Expect(TunRootOwnedPath([NSURL fileURLWithPath:@"/"]), @"protected system root with no ACL is accepted");
+        Expect(!TunRootOwnedPath([NSURL fileURLWithPath:@"/v2rayn-nonexistent-path-policy-test"]), @"missing path is not mistaken for an absent ACL");
         xpc_object_t fake = xpc_dictionary_create(NULL, NULL, 0);
         Expect(!TunValidateMessage(fake, TUN_APP_ID), @"no forged PID/message without an audit token");
 #ifdef V2RAYN_TUN_LOCAL_TRUST

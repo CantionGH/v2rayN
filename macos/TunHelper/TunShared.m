@@ -4,6 +4,7 @@
 #include <mach-o/dyld.h>
 #include <sys/acl.h>
 #include <errno.h>
+#include <fcntl.h>
 
 static NSDictionary *SigningInfo(SecCodeRef code, SecCSFlags flags) {
     CFDictionaryRef info = NULL;
@@ -71,13 +72,22 @@ BOOL TunRootOwnedPath(NSURL *url) {
     if (![path hasPrefix:@"/"]) return NO;
     while (YES) {
         struct stat st;
+        filesec_t security = filesec_init();
+        if (!security) return NO;
+        int hasACL = 0;
+        acl_t acl = NULL;
         // Reject symlinks, non-root owners, and group/other-writable ancestors.
-        if (lstat(path.fileSystemRepresentation, &st) != 0 || S_ISLNK(st.st_mode)
-            || st.st_uid != 0 || (st.st_mode & (0022 | S_ISUID | S_ISGID))) return NO;
+        BOOL safe = lstatx_np(path.fileSystemRepresentation, &st, security) == 0 && !S_ISLNK(st.st_mode)
+            && st.st_uid == 0 && !(st.st_mode & (0022 | S_ISUID | S_ISGID));
         // Mode bits alone miss ACL grants. Do not trust writable bundle entries
         // or ancestors even if stat reports root:wheel 0755/0644.
-        acl_t acl = acl_get_file(path.fileSystemRepresentation, ACL_TYPE_EXTENDED);
-        if (!acl && errno != ENOATTR) return NO;
+        // Darwin acl_get_file returns ENOENT for an absent ACL property as well
+        // as a missing path. Query the property explicitly from the successful
+        // lstatx snapshot instead of confusing absence with a lookup error.
+        safe = safe && filesec_query_property(security, FILESEC_ACL, &hasACL) == 0;
+        if (safe && hasACL) safe = filesec_get_property(security, FILESEC_ACL, &acl) == 0 && acl != NULL;
+        filesec_free(security);
+        if (!safe) { if (acl) acl_free(acl); return NO; }
         if (acl) {
             acl_entry_t entry;
             int next = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
