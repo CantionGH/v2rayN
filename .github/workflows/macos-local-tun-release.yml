@@ -51,6 +51,13 @@ jobs:
           bash macos/build-tun-helper.sh "$RID" "$RUNNER_TEMP/tun-native" local
       - name: Check bundle signing and PKG layout before AOT compilation
         run: bash macos/test-local-package.sh "$RUNNER_TEMP/tun-package-fixture" "$RUNNER_TEMP/tun-native"
+      - name: Check installer scripts with the small fixture on the disposable runner
+        run: |
+          if ! sudo /usr/sbin/installer -verboseR -pkg "$RUNNER_TEMP/tun-package-fixture/fixture.pkg" -target /; then
+            sudo tail -n 200 /var/log/install.log
+            exit 1
+          fi
+          sudo /bin/bash -p '/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/Resources/LocalTun/uninstall.sh'
       - name: Publish NativeAOT GUI
         run: |
           dotnet publish v2rayN/v2rayN.Desktop/v2rayN.Desktop.csproj -c Release -r "$RID" \
@@ -77,7 +84,10 @@ jobs:
           cp LICENSE dist/LICENSE.txt
       - name: Install and test authenticated IPC without creating TUN/routes
         run: |
-          sudo /usr/sbin/installer -pkg "dist/v2rayN-macos-${{ matrix.arch }}-local-tun.pkg" -target /
+          if ! sudo /usr/sbin/installer -verboseR -pkg "dist/v2rayN-macos-${{ matrix.arch }}-local-tun.pkg" -target /; then
+            sudo tail -n 200 /var/log/install.log
+            exit 1
+          fi
           '/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/MacOS/v2rayN' --macos-tun-self-test
           xcrun clang -DV2RAYN_TUN_LOCAL_TRUST=1 -fobjc-arc -fblocks -Wall -Wextra -Werror -Wno-unused-parameter \
             macos/TunHelper/Tests/UntrustedClient.m -framework Foundation -o "$RUNNER_TEMP/untrusted-client"

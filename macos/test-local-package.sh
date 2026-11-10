@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 # Exercise real macOS signing/pkgbuild before the expensive NativeAOT publish.
-# This fixture is not installed or uploaded, and is NOT a usable GUI/TUN build.
+# This is NOT a usable GUI/TUN build and is never uploaded. CI may install it
+# solely to test root installer scripts on the disposable runner, then revoke it.
 WORK="${1:?Usage: test-local-package.sh NEW_FIXTURE_DIRECTORY LOCAL_NATIVE_OUTPUT}"
 NATIVE="${2:?Missing local native output directory}"
 [[ ! -e "$WORK" && ! -L "$WORK" ]] || { echo 'Fixture directory must be new.' >&2; exit 1; }
