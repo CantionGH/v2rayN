@@ -12,6 +12,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 }
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp -R "$PUBLISHED/." "$APP/Contents/MacOS/"
+mv "$APP/Contents/MacOS/v2rayN.NativeAOT" "$APP/Contents/Resources/"
 cp -R "$CORES/bin" "$APP/Contents/MacOS/"
 cp "$PUBLISHED/v2rayN.icns" "$APP/Contents/Resources/AppIcon.icns"
 echo 'Store GUI data in the ordinary user data directory, never in this bundle.' > "$APP/Contents/MacOS/NotStoreConfigHere.txt"

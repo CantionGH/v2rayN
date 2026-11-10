@@ -170,7 +170,7 @@ NSDictionary *TunLocalCreateManifest(NSURL *app, NSString **error) {
     // pins from the installed protected bytes, not a caller-supplied manifest.
     if (geteuid() != 0) { *error = @"Local trust enrollment requires the system installer/root"; return nil; }
     NSDictionary *files = Inventory(app);
-    if (!files || !files[@"Contents/MacOS/v2rayN.NativeAOT"]) { *error = @"Unsafe or incomplete installed NativeAOT bundle"; return nil; }
+    if (!files || !files[@"Contents/Resources/v2rayN.NativeAOT"]) { *error = @"Unsafe or incomplete installed NativeAOT bundle"; return nil; }
     NSMutableDictionary *executables = [NSMutableDictionary dictionary];
     for (NSString *identifier in ExecutablePaths()) {
         NSString *relative = ExecutablePaths()[identifier];

@@ -6,7 +6,7 @@ OUTPUT="${3:?Missing output pkg}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$(cd "$(dirname "$APP")" && pwd)/$(basename "$APP")"
 [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || { echo 'Expected a numeric bundle version.' >&2; exit 1; }
-[[ "$(basename "$APP")" == v2rayN.app && -f "$APP/Contents/MacOS/v2rayN.NativeAOT" &&
+[[ "$(basename "$APP")" == v2rayN.app && -f "$APP/Contents/Resources/v2rayN.NativeAOT" &&
    -f "$APP/Contents/Resources/TunLocalTrustBuild" && -f "$APP/Contents/Library/LaunchServices/v2rayn-tun-trust" ]] || {
   echo 'Assemble a NativeAOT app with explicitly local-mode native components first.' >&2; exit 1;
 }

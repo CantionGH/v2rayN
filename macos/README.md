@@ -103,7 +103,7 @@ Assemble `v2rayN.app` using the existing macOS packaging layout:
   `NotStoreConfigHere.txt`. Point it at the **NativeAOT** output, not the JIT
   artifact. It also obtains the regular core bundle.
 - Merge the correct architecture's core bundle into `Contents/MacOS/bin` and
-  mark the reviewed AOT output with `Contents/MacOS/v2rayN.NativeAOT`.
+  mark the reviewed AOT output with `Contents/Resources/v2rayN.NativeAOT`.
   The existing build workflow writes that marker only for `isAot=true`.
 - Install native components before signing:
 

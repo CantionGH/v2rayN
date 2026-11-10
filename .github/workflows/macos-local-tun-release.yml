@@ -49,6 +49,8 @@ jobs:
         run: |
           bash macos/test-tun-helper.sh "$RUNNER_TEMP/tun-tests" local
           bash macos/build-tun-helper.sh "$RID" "$RUNNER_TEMP/tun-native" local
+      - name: Check bundle signing and PKG layout before AOT compilation
+        run: bash macos/test-local-package.sh "$RUNNER_TEMP/tun-package-fixture" "$RUNNER_TEMP/tun-native"
       - name: Publish NativeAOT GUI
         run: |
           dotnet publish v2rayN/v2rayN.Desktop/v2rayN.Desktop.csproj -c Release -r "$RID" \

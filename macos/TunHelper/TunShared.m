@@ -142,7 +142,7 @@ BOOL TunValidateApplication(NSURL *app) {
     if (!app || ![app.URLByDeletingLastPathComponent.path isEqualToString:TUN_INSTALL_PARENT]
         || !TunValidateExecutable(app, TUN_APP_ID)) return NO;
     if (![NSFileManager.defaultManager fileExistsAtPath:
-        [app URLByAppendingPathComponent:@"Contents/MacOS/v2rayN.NativeAOT"].path]) return NO;
+        [app URLByAppendingPathComponent:@"Contents/Resources/v2rayN.NativeAOT"].path]) return NO;
     // Check every bundle entry's ownership too. A signed root-owned container
     // must not contain user-writable native libraries, managed assemblies or data.
     __block BOOL failed = NO;

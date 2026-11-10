@@ -22,7 +22,7 @@ if [[ "$APPLICATION_IDENTITY" != "Developer ID Application:"* || "$INSTALLER_IDE
   echo "Real Developer ID Application/Installer identities are required; ad-hoc signing is not supported." >&2
   exit 1
 fi
-if [[ ! -f "$APP/Contents/MacOS/v2rayN.NativeAOT" ]]; then
+if [[ ! -f "$APP/Contents/Resources/v2rayN.NativeAOT" ]]; then
   echo "Privileged TUN currently requires a NativeAOT build. Rebuild with -p:IsAot=true." >&2
   exit 1
 fi
