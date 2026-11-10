@@ -140,37 +140,52 @@ BOOL TunLocalValidateFile(NSURL *url, NSString *identifier) {
         [FileHash(file) isEqual:manifest[@"files"][relative]];
 }
 
-static NSDictionary *Inventory(NSURL *app) {
-    if (![app.path isEqual:TUN_INSTALL_PARENT @"/v2rayN.app"] || !TunRootOwnedPath(app)) return nil;
+static NSDictionary *InventoryError(NSString **error, NSString *reason, NSURL *url) {
+    if (error) {
+        struct stat st = {0};
+        lstat(url.fileSystemRepresentation, &st);
+        *error = [NSString stringWithFormat:@"%@: %@ (uid=%u mode=%o links=%u)",
+            reason, url.path ?: @"<missing>", st.st_uid, st.st_mode, st.st_nlink];
+    }
+    return nil;
+}
+
+static NSDictionary *Inventory(NSURL *app, NSString **error) {
+    if (![app.path isEqual:TUN_INSTALL_PARENT @"/v2rayN.app"] || !TunRootOwnedPath(app))
+        return InventoryError(error, @"Unsafe or unexpected bundle location", app);
     NSMutableDictionary *files = [NSMutableDictionary dictionary];
     __block BOOL failed = NO;
     NSDirectoryEnumerator *entries = [NSFileManager.defaultManager enumeratorAtURL:app includingPropertiesForKeys:nil
         options:0 errorHandler:^BOOL(NSURL *url, NSError *error) { failed = YES; return NO; }];
-    if (!entries) return nil;
+    if (!entries) return InventoryError(error, @"Cannot enumerate bundle", app);
     for (NSURL *url in entries) {
         struct stat st;
-        if (!TunRootOwnedPath(url) || lstat(url.fileSystemRepresentation, &st) != 0) return nil;
+        if (!TunRootOwnedPath(url) || lstat(url.fileSystemRepresentation, &st) != 0)
+            return InventoryError(error, @"Unsafe bundle entry or ancestor", url);
         if (S_ISDIR(st.st_mode)) continue;
-        if (!S_ISREG(st.st_mode) || files.count >= 8192) return nil;
+        if (!S_ISREG(st.st_mode) || files.count >= 8192)
+            return InventoryError(error, @"Invalid entry type or inventory limit", url);
         NSString *relative = [url.path substringFromIndex:app.path.length + 1];
         NSString *hash = FileHash(url);
-        if (!RelativePath(relative) || !hash) return nil;
+        if (!RelativePath(relative) || !hash)
+            return InventoryError(error, @"Invalid relative path or protected file hash", url);
         files[relative] = hash;
     }
-    return failed ? nil : files;
+    return failed ? InventoryError(error, @"Bundle enumeration failed", app) : files;
 }
 
 BOOL TunLocalVerifyInventory(NSURL *app) {
     NSDictionary *manifest = TunLocalReadManifest();
-    return manifest && [Inventory(app) isEqual:manifest[@"files"]];
+    return manifest && [Inventory(app, NULL) isEqual:manifest[@"files"]];
 }
 
 NSDictionary *TunLocalCreateManifest(NSURL *app, NSString **error) {
     // Enrollment is an installer/root action, never an XPC operation. Compute
     // pins from the installed protected bytes, not a caller-supplied manifest.
     if (geteuid() != 0) { *error = @"Local trust enrollment requires the system installer/root"; return nil; }
-    NSDictionary *files = Inventory(app);
-    if (!files || !files[@"Contents/Resources/v2rayN.NativeAOT"]) { *error = @"Unsafe or incomplete installed NativeAOT bundle"; return nil; }
+    NSDictionary *files = Inventory(app, error);
+    if (!files) return nil;
+    if (!files[@"Contents/Resources/v2rayN.NativeAOT"]) { *error = @"Missing installed NativeAOT resource marker"; return nil; }
     NSMutableDictionary *executables = [NSMutableDictionary dictionary];
     for (NSString *identifier in ExecutablePaths()) {
         NSString *relative = ExecutablePaths()[identifier];

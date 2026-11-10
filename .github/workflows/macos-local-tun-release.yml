@@ -55,6 +55,8 @@ jobs:
         run: |
           if ! sudo /usr/sbin/installer -verboseR -pkg "$RUNNER_TEMP/tun-package-fixture/fixture.pkg" -target /; then
             sudo tail -n 200 /var/log/install.log
+            sudo ls -lde / /Library '/Library/Application Support' '/Library/Application Support/v2rayN-LocalTun'
+            sudo find '/Library/Application Support/v2rayN-LocalTun/v2rayN.app' -exec ls -lde {} \;
             exit 1
           fi
           sudo /bin/bash -p '/Library/Application Support/v2rayN-LocalTun/v2rayN.app/Contents/Resources/LocalTun/uninstall.sh'
